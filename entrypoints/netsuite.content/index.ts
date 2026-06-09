@@ -1,26 +1,74 @@
 import { formatJson, tryParseJson } from '../../utils/json';
 import { renderJsonTree } from '../../utils/json-tree';
+import {
+  diagnoseFields,
+  EDIT_MODE,
+  FIELD_SELECTOR,
+  findFieldContainers,
+  getFieldHost,
+  isTextareaFieldSpan,
+  isViewingJson,
+  MASKED_CLASS,
+  NETSUITE_MATCHES,
+  readFieldValue,
+  removePanelIn,
+  resolveValueTarget,
+  VIEW_MODE,
+  type FieldSpan,
+  type ValueTarget,
+} from '../../utils/netsuite-fields';
 import './style.css';
 
-const FIELD_SELECTOR = '[data-field-type="textarea"]';
 const PROCESSED_ATTR = 'data-ns-jsonview';
+const BOUND_ATTR = 'data-ns-jsonview-bound';
+const RETRY_MS = 500;
+const MAX_RETRIES = 60;
 
 type ViewMode = 'tree' | 'raw';
 
-function findTextControl(container: Element): HTMLTextAreaElement | null {
-  if (container instanceof HTMLTextAreaElement) return container;
+type PanelOptions = {
+  onEditRaw: () => void;
+};
 
-  const textarea = container.querySelector('textarea');
-  if (textarea instanceof HTMLTextAreaElement) return textarea;
-
-  return null;
+declare global {
+  interface Window {
+    __nsJsonviewDiagnose?: () => ReturnType<typeof diagnoseFields>;
+  }
 }
 
-function readFieldValue(textarea: HTMLTextAreaElement): string {
-  return textarea.value ?? '';
+function isDebugEnabled(): boolean {
+  try {
+    return localStorage.getItem('ns-jsonview-debug') === '1';
+  } catch {
+    return false;
+  }
 }
 
-function createPanel(textarea: HTMLTextAreaElement, parsed: unknown): HTMLElement {
+function debug(...args: unknown[]): void {
+  if (isDebugEnabled()) {
+    console.log('[ns-jsonview]', ...args);
+  }
+}
+
+function markActive(): void {
+  const root = document.documentElement;
+  root.dataset.nsJsonview = 'active';
+  root.dataset.nsJsonviewFrame = window.top === window ? 'top' : 'iframe';
+}
+
+function exposeDiagnostics(): void {
+  window.__nsJsonviewDiagnose = () => {
+    const report = diagnoseFields();
+    console.table(report);
+    return report;
+  };
+}
+
+function createPanel(
+  target: ValueTarget,
+  parsed: unknown,
+  options: PanelOptions,
+): HTMLElement {
   const panel = document.createElement('div');
   panel.className = 'nsjv-panel';
 
@@ -49,7 +97,12 @@ function createPanel(textarea: HTMLTextAreaElement, parsed: unknown): HTMLElemen
   copyBtn.className = 'nsjv-btn';
   copyBtn.textContent = 'Copy';
 
-  actions.append(treeBtn, rawBtn, copyBtn);
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'nsjv-btn nsjv-btn-edit';
+  editBtn.textContent = 'Edit raw';
+
+  actions.append(treeBtn, rawBtn, copyBtn, editBtn);
   header.append(title, actions);
 
   const body = document.createElement('div');
@@ -58,7 +111,7 @@ function createPanel(textarea: HTMLTextAreaElement, parsed: unknown): HTMLElemen
   const treeView = renderJsonTree(parsed);
   const rawView = document.createElement('pre');
   rawView.hidden = true;
-  rawView.textContent = formatJson(readFieldValue(textarea)) ?? '';
+  rawView.textContent = formatJson(readFieldValue(target)) ?? '';
 
   body.append(treeView, rawView);
   panel.append(header, body);
@@ -75,9 +128,10 @@ function createPanel(textarea: HTMLTextAreaElement, parsed: unknown): HTMLElemen
 
   treeBtn.addEventListener('click', () => setMode('tree'));
   rawBtn.addEventListener('click', () => setMode('raw'));
+  editBtn.addEventListener('click', options.onEditRaw);
 
   copyBtn.addEventListener('click', async () => {
-    const text = mode === 'tree' ? rawView.textContent ?? '' : rawView.textContent ?? '';
+    const text = rawView.textContent ?? '';
     try {
       await navigator.clipboard.writeText(text);
       copyBtn.textContent = 'Copied';
@@ -96,49 +150,109 @@ function createPanel(textarea: HTMLTextAreaElement, parsed: unknown): HTMLElemen
   return panel;
 }
 
-function removePanel(container: Element): void {
-  const existing = container.querySelector('.nsjv-panel');
-  existing?.remove();
+function showJsonView(
+  span: FieldSpan,
+  target: ValueTarget,
+  parsed: unknown,
+): void {
+  const host = getFieldHost(span);
+  removePanelIn(host);
+  host.classList.add(MASKED_CLASS);
+
+  const panel = createPanel(target, parsed, {
+    onEditRaw: () => showRawField(span, target),
+  });
+
+  host.append(panel);
+  span.setAttribute(PROCESSED_ATTR, VIEW_MODE);
 }
 
-function enhanceField(container: Element): void {
-  if (container.hasAttribute(PROCESSED_ATTR)) return;
+function showRawField(span: FieldSpan, target: ValueTarget): void {
+  const host = getFieldHost(span);
+  host.classList.remove(MASKED_CLASS);
+  removePanelIn(host);
+  span.setAttribute(PROCESSED_ATTR, EDIT_MODE);
 
-  const textarea = findTextControl(container);
-  if (!textarea) return;
+  const remask = () => {
+    const parsed = tryParseJson(readFieldValue(target));
+    if (parsed !== null) {
+      showJsonView(span, target, parsed);
+    }
+  };
 
-  const value = readFieldValue(textarea);
+  if (target instanceof HTMLTextAreaElement) {
+    target.addEventListener('blur', remask, { once: true });
+    target.focus();
+  } else {
+    target.addEventListener('blur', remask, { once: true });
+  }
+}
+
+function enhanceField(span: FieldSpan): boolean {
+  if (isViewingJson(span)) return false;
+
+  const target = resolveValueTarget(span);
+  const value = readFieldValue(target);
   const parsed = tryParseJson(value);
-  if (parsed === null) return;
 
-  container.setAttribute(PROCESSED_ATTR, 'true');
-  removePanel(container);
+  if (parsed === null) {
+    if (span.getAttribute(PROCESSED_ATTR) === EDIT_MODE) {
+      return false;
+    }
 
-  const panel = createPanel(textarea, parsed);
-  textarea.insertAdjacentElement('afterend', panel);
+    debug('No valid JSON in textarea field span', {
+      fieldId: span.getAttribute('data-field-id'),
+      valueTarget: target.tagName,
+      valueLength: value.length,
+      preview: value.slice(0, 80),
+    });
+    return false;
+  }
+
+  showJsonView(span, target, parsed);
+  debug('Masked field with JSON view', span.getAttribute('data-field-id'));
+  bindValueWatchers(span, target);
+
+  return true;
+}
+
+function bindValueWatchers(span: FieldSpan, target: ValueTarget): void {
+  if (span.hasAttribute(BOUND_ATTR)) return;
+  span.setAttribute(BOUND_ATTR, 'true');
 
   const refresh = () => {
-    const nextValue = readFieldValue(textarea);
-    const nextParsed = tryParseJson(nextValue);
+    if (!isViewingJson(span)) return;
 
+    const nextParsed = tryParseJson(readFieldValue(target));
     if (nextParsed === null) {
-      removePanel(container);
-      container.removeAttribute(PROCESSED_ATTR);
+      showRawField(span, target);
+      span.removeAttribute(PROCESSED_ATTR);
+      span.removeAttribute(BOUND_ATTR);
       return;
     }
 
-    const nextPanel = createPanel(textarea, nextParsed);
-    panel.replaceWith(nextPanel);
+    showJsonView(span, target, nextParsed);
   };
 
-  textarea.addEventListener('input', refresh);
-  textarea.addEventListener('change', refresh);
+  if (target instanceof HTMLTextAreaElement) {
+    target.addEventListener('input', refresh);
+    target.addEventListener('change', refresh);
+  } else {
+    const observer = new MutationObserver(refresh);
+    observer.observe(target, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  }
 }
 
-function scan(root: ParentNode = document): void {
-  root.querySelectorAll(FIELD_SELECTOR).forEach((container) => {
-    enhanceField(container);
+function scan(root: ParentNode = document): number {
+  let enhanced = 0;
+  findFieldContainers(root).forEach((span) => {
+    if (enhanceField(span)) enhanced += 1;
   });
+  return enhanced;
 }
 
 function observeDynamicFields(): void {
@@ -147,7 +261,7 @@ function observeDynamicFields(): void {
       mutation.addedNodes.forEach((node) => {
         if (!(node instanceof Element)) return;
 
-        if (node.matches(FIELD_SELECTOR)) {
+        if (isTextareaFieldSpan(node)) {
           enhanceField(node);
           return;
         }
@@ -159,14 +273,53 @@ function observeDynamicFields(): void {
     }
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+}
+
+function scheduleRetries(): void {
+  let attempts = 0;
+
+  const retry = () => {
+    attempts += 1;
+    const fields = findFieldContainers().length;
+    const enhanced = scan();
+
+    debug(`Scan attempt ${attempts}`, { fields, enhanced });
+
+    if (attempts === 1 || attempts === MAX_RETRIES) {
+      debug('Field diagnostics', diagnoseFields());
+    }
+
+    if (attempts < MAX_RETRIES) {
+      window.setTimeout(retry, RETRY_MS);
+    }
+  };
+
+  window.setTimeout(retry, RETRY_MS);
+}
+
+function boot(): void {
+  markActive();
+  exposeDiagnostics();
+
+  debug('Boot', {
+    href: location.href,
+    frame: document.documentElement.dataset.nsJsonviewFrame,
+    fields: findFieldContainers().length,
+    enhanced: scan(),
+  });
+
+  observeDynamicFields();
+  scheduleRetries();
 }
 
 export default defineContentScript({
-  matches: ['*://*.netsuite.com/*'],
+  matches: [...NETSUITE_MATCHES],
+  allFrames: true,
   runAt: 'document_idle',
   main() {
-    scan();
-    observeDynamicFields();
+    boot();
   },
 });

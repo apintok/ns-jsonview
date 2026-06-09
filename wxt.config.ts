@@ -7,6 +7,6 @@ export default defineConfig({
     description:
       'Detects JSON in NetSuite Text Area fields and displays a formatted tree view.',
     permissions: [],
-    host_permissions: ['*://*.netsuite.com/*'],
+    host_permissions: ['*://*.netsuite.com/*', '*://*.app.netsuite.com/*'],
   },
 });

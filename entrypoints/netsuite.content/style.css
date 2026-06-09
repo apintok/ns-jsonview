@@ -1,5 +1,21 @@
+.nsjv-masked > *:not(.nsjv-panel) {
+  display: none !important;
+}
+
+.nsjv-masked textarea {
+  display: block !important;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 .nsjv-panel {
-  margin-top: 6px;
   border: 1px solid #c8d2e0;
   border-radius: 6px;
   background: #f8fafc;
@@ -7,6 +23,8 @@
   font-size: 12px;
   line-height: 1.45;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .nsjv-header {
@@ -31,6 +49,7 @@
 .nsjv-actions {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .nsjv-btn {
@@ -45,6 +64,10 @@
 
 .nsjv-btn:hover {
   background: #f1f5f9;
+}
+
+.nsjv-btn-edit {
+  margin-left: 2px;
 }
 
 .nsjv-body {
