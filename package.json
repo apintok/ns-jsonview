@@ -1,0 +1,22 @@
+{
+  "name": "ns-jsonview",
+  "version": "1.0.0",
+  "description": "Pretty-format JSON stored in NetSuite Text Area fields",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apintok/ns-jsonview.git"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "wxt": "^0.20.7"
+  }
+}

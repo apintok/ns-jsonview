@@ -1,0 +1,112 @@
+.nsjv-panel {
+  margin-top: 6px;
+  border: 1px solid #c8d2e0;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+.nsjv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #e8eef6;
+  border-bottom: 1px solid #c8d2e0;
+  color: #334155;
+  user-select: none;
+}
+
+.nsjv-title {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.nsjv-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.nsjv-btn {
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.nsjv-btn:hover {
+  background: #f1f5f9;
+}
+
+.nsjv-body {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+.nsjv-tree {
+  color: #1e293b;
+}
+
+.nsjv-line {
+  padding-left: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.nsjv-block > .nsjv-line:first-child {
+  padding-left: 0;
+  cursor: pointer;
+}
+
+.nsjv-toggle {
+  display: inline-block;
+  width: 12px;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nsjv-summary {
+  color: #64748b;
+}
+
+.nsjv-key {
+  color: #7c3aed;
+}
+
+.nsjv-string {
+  color: #047857;
+}
+
+.nsjv-number {
+  color: #b45309;
+}
+
+.nsjv-boolean {
+  color: #1d4ed8;
+}
+
+.nsjv-null {
+  color: #64748b;
+  font-style: italic;
+}
+
+.nsjv-bracket,
+.nsjv-comma {
+  color: #475569;
+}
+
+.nsjv-error {
+  color: #b91c1c;
+  padding: 8px 10px;
+}
