@@ -77,6 +77,21 @@ ns-jsonview/
 
 WXT auto-generates the manifest from `entrypoints/` and outputs builds to `.output/`.
 
+### Icon
+
+The extension icon is **`{NS}`** in monospace on a blue rounded square — NetSuite + JSON curly-bracket motif.
+
+| File | Purpose |
+|------|---------|
+| `icon.svg` | Source artwork (edit this) |
+| `public/icon/*.png` | Generated sizes (16, 32, 48, 96, 128) |
+
+Regenerate PNGs after editing the SVG:
+
+```bash
+npm run icons
+```
+
 ## Development
 
 ### Prerequisites
@@ -205,14 +220,13 @@ After reloading the extension, check these steps on your NetSuite page:
 - **Top-level objects and arrays** — JSON primitives (e.g. `"hello"`, `42`) are not enhanced.
 - **Strict JSON** — Trailing commas, single-quoted keys, and other non-JSON syntax are ignored.
 - **Iframes** — Fields inside iframes are not scanned unless `all_frames` support is added.
-- **Icons** — Store icons (16 / 48 / 128 px) are not yet included; add them under `public/icon/` before publishing.
 
 ## Roadmap ideas
 
 - [ ] Support for iframe-embedded NetSuite fields
 - [ ] Optional prettify-on-blur for the textarea itself
 - [ ] Extension popup toggle to enable/disable per session
-- [ ] Chrome Web Store listing assets and icons
+- [ ] Chrome Web Store listing assets (screenshots, promo tiles)
 
 ## License
 
