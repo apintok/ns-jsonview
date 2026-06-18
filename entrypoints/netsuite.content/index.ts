@@ -2,14 +2,15 @@ import { formatJson, tryParseJson } from '../../utils/json';
 import { renderJsonTree } from '../../utils/json-tree';
 import {
   diagnoseFields,
-  EDIT_MODE,
   FIELD_SELECTOR,
   findFieldContainers,
   getFieldHost,
+  isJsonViewDisabled,
   isTextareaFieldSpan,
   isViewingJson,
   MASKED_CLASS,
   NETSUITE_MATCHES,
+  RAW_MODE,
   readFieldValue,
   removePanelIn,
   resolveValueTarget,
@@ -24,10 +25,8 @@ const BOUND_ATTR = 'data-ns-jsonview-bound';
 const RETRY_MS = 500;
 const MAX_RETRIES = 60;
 
-type ViewMode = 'tree' | 'raw';
-
 type PanelOptions = {
-  onEditRaw: () => void;
+  onDisableView: () => void;
 };
 
 declare global {
@@ -82,58 +81,31 @@ function createPanel(
   const actions = document.createElement('div');
   actions.className = 'nsjv-actions';
 
-  const treeBtn = document.createElement('button');
-  treeBtn.type = 'button';
-  treeBtn.className = 'nsjv-btn';
-  treeBtn.textContent = 'Tree';
-
-  const rawBtn = document.createElement('button');
-  rawBtn.type = 'button';
-  rawBtn.className = 'nsjv-btn';
-  rawBtn.textContent = 'Formatted';
-
   const copyBtn = document.createElement('button');
   copyBtn.type = 'button';
   copyBtn.className = 'nsjv-btn';
   copyBtn.textContent = 'Copy';
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'nsjv-btn nsjv-btn-edit';
-  editBtn.textContent = 'Edit raw';
+  const disableViewBtn = document.createElement('button');
+  disableViewBtn.type = 'button';
+  disableViewBtn.className = 'nsjv-btn';
+  disableViewBtn.textContent = 'Disable View';
 
-  actions.append(treeBtn, rawBtn, copyBtn, editBtn);
+  actions.append(copyBtn, disableViewBtn);
   header.append(title, actions);
 
   const body = document.createElement('div');
   body.className = 'nsjv-body';
-
-  const treeView = renderJsonTree(parsed);
-  const rawView = document.createElement('pre');
-  rawView.hidden = true;
-  rawView.textContent = formatJson(readFieldValue(target)) ?? '';
-
-  body.append(treeView, rawView);
+  body.append(renderJsonTree(parsed));
   panel.append(header, body);
 
-  let mode: ViewMode = 'tree';
+  const formattedJson = formatJson(readFieldValue(target)) ?? '';
 
-  const setMode = (next: ViewMode) => {
-    mode = next;
-    treeView.hidden = mode !== 'tree';
-    rawView.hidden = mode !== 'raw';
-    treeBtn.disabled = mode === 'tree';
-    rawBtn.disabled = mode === 'raw';
-  };
-
-  treeBtn.addEventListener('click', () => setMode('tree'));
-  rawBtn.addEventListener('click', () => setMode('raw'));
-  editBtn.addEventListener('click', options.onEditRaw);
+  disableViewBtn.addEventListener('click', options.onDisableView);
 
   copyBtn.addEventListener('click', async () => {
-    const text = rawView.textContent ?? '';
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(formattedJson);
       copyBtn.textContent = 'Copied';
       window.setTimeout(() => {
         copyBtn.textContent = 'Copy';
@@ -146,7 +118,6 @@ function createPanel(
     }
   });
 
-  setMode('tree');
   return panel;
 }
 
@@ -160,46 +131,28 @@ function showJsonView(
   host.classList.add(MASKED_CLASS);
 
   const panel = createPanel(target, parsed, {
-    onEditRaw: () => showRawField(span, target),
+    onDisableView: () => disableJsonView(span),
   });
 
   host.append(panel);
   span.setAttribute(PROCESSED_ATTR, VIEW_MODE);
 }
 
-function showRawField(span: FieldSpan, target: ValueTarget): void {
+function disableJsonView(span: FieldSpan): void {
   const host = getFieldHost(span);
   host.classList.remove(MASKED_CLASS);
   removePanelIn(host);
-  span.setAttribute(PROCESSED_ATTR, EDIT_MODE);
-
-  const remask = () => {
-    const parsed = tryParseJson(readFieldValue(target));
-    if (parsed !== null) {
-      showJsonView(span, target, parsed);
-    }
-  };
-
-  if (target instanceof HTMLTextAreaElement) {
-    target.addEventListener('blur', remask, { once: true });
-    target.focus();
-  } else {
-    target.addEventListener('blur', remask, { once: true });
-  }
+  span.setAttribute(PROCESSED_ATTR, RAW_MODE);
 }
 
 function enhanceField(span: FieldSpan): boolean {
-  if (isViewingJson(span)) return false;
+  if (isViewingJson(span) || isJsonViewDisabled(span)) return false;
 
   const target = resolveValueTarget(span);
   const value = readFieldValue(target);
   const parsed = tryParseJson(value);
 
   if (parsed === null) {
-    if (span.getAttribute(PROCESSED_ATTR) === EDIT_MODE) {
-      return false;
-    }
-
     debug('No valid JSON in textarea field span', {
       fieldId: span.getAttribute('data-field-id'),
       valueTarget: target.tagName,
@@ -225,8 +178,7 @@ function bindValueWatchers(span: FieldSpan, target: ValueTarget): void {
 
     const nextParsed = tryParseJson(readFieldValue(target));
     if (nextParsed === null) {
-      showRawField(span, target);
-      span.removeAttribute(PROCESSED_ATTR);
+      disableJsonView(span);
       span.removeAttribute(BOUND_ATTR);
       return;
     }

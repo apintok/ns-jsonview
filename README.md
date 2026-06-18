@@ -12,10 +12,9 @@ NetSuite often stores integration payloads, configuration, and API responses in 
 
 When a NetSuite Text Area contains valid JSON (an object or array), the extension **replaces** the raw field UI with a **JSON View** panel:
 
-- **Tree** — collapsible key/value explorer
-- **Formatted** — pretty-printed JSON (`2`-space indent)
+- **Tree** — collapsible key/value explorer (always shown)
 - **Copy** — copies formatted JSON to the clipboard
-- **Edit raw** — temporarily shows the original field for editing; switches back to JSON view on blur if content is still valid JSON
+- **Disable View** — hides the JSON view and restores the original NetSuite field display (stays off until you reload the page)
 
 The underlying `<textarea>` stays in the DOM (visually hidden) so NetSuite form save behavior stays intact.
 
@@ -104,13 +103,23 @@ Load the unpacked extension from `.output/chrome-mv3-dev`:
 3. Click **Load unpacked**
 4. Select the `.output/chrome-mv3-dev` folder
 
-### Production build
+**Keep `npm run dev` running** in a terminal while you use the dev build. WXT uses a WebSocket on `ws://localhost:3000/` for hot reload. If the dev server is stopped, Chrome will log:
+
+```
+WebSocket connection to 'ws://localhost:3000/' failed: net::ERR_CONNECTION_REFUSED
+```
+
+The extension may still work, but you will see that error on every page (including NetSuite). To avoid it, use a production build for testing (below).
+
+### Production build (recommended for NetSuite testing)
 
 ```bash
 npm run build
 ```
 
 Output: `.output/chrome-mv3/`
+
+Load `.output/chrome-mv3` as unpacked instead of `chrome-mv3-dev`. Production builds have **no WebSocket** and no dev-server dependency.
 
 ### Package for Chrome Web Store
 
@@ -187,7 +196,7 @@ After reloading the extension, check these steps on your NetSuite page:
    ```
 
 3. Confirm a **JSON View** panel appears below the field.
-4. Use **Tree**, **Formatted**, and **Copy** to verify behavior.
+4. Use **Copy** and **Disable View** to verify behavior.
 5. Edit the textarea — the panel should refresh or disappear if the content is no longer valid JSON.
 
 ## Known limitations

@@ -10,7 +10,11 @@ export const FIELD_SELECTOR = 'div span[data-field-type="textarea"]';
 
 export const MASKED_CLASS = 'nsjv-masked';
 export const VIEW_MODE = 'view';
-export const EDIT_MODE = 'edit';
+export const RAW_MODE = 'raw';
+
+export function isJsonViewDisabled(span: FieldSpan): boolean {
+  return span.getAttribute('data-ns-jsonview') === RAW_MODE;
+}
 
 export type FieldSpan = HTMLSpanElement;
 export type ValueTarget = HTMLSpanElement | HTMLTextAreaElement;
