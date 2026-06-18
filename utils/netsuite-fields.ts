@@ -54,6 +54,58 @@ export function getFieldHost(span: FieldSpan): HTMLDivElement | FieldSpan {
   return getFieldDiv(span) ?? span;
 }
 
+function cleanLabelText(text: string | null | undefined): string | null {
+  const cleaned = text?.replace(/\s+/g, ' ').trim() ?? '';
+  return cleaned || null;
+}
+
+export function getFieldLabel(span: FieldSpan): string | null {
+  const wrapper = span.closest(
+    '.uir-field-wrapper, tr.uir-field-wrapper, [data-field-label]',
+  );
+
+  if (wrapper) {
+    const fromAttr = cleanLabelText(wrapper.getAttribute('data-field-label'));
+    if (fromAttr) return fromAttr;
+
+    const labelEl = wrapper.querySelector(
+      '.uir-field-label, .uir-label, td.label, td.uir-label, label, .labelSpanEdit, .smallgraytextnolink',
+    );
+    const fromEl = cleanLabelText(labelEl?.textContent);
+    if (fromEl) return fromEl;
+  }
+
+  const row = span.closest('tr');
+  if (row) {
+    const labelCell = row.querySelector(
+      'td.label, td.uir-label, td:first-child .smallgraytextnolink, td:first-child label',
+    );
+    const fromRow = cleanLabelText(labelCell?.textContent);
+    if (fromRow) return fromRow;
+  }
+
+  const textarea = getFieldDiv(span)?.querySelector('textarea');
+  if (textarea instanceof HTMLTextAreaElement) {
+    if (textarea.id) {
+      const label = document.querySelector<HTMLLabelElement>(
+        `label[for="${CSS.escape(textarea.id)}"]`,
+      );
+      const fromFor = cleanLabelText(label?.textContent);
+      if (fromFor) return fromFor;
+    }
+
+    const ariaLabel = cleanLabelText(textarea.getAttribute('aria-label'));
+    if (ariaLabel) return ariaLabel;
+  }
+
+  return cleanLabelText(span.getAttribute('data-field-id'));
+}
+
+export function formatPanelTitle(label: string | null): string {
+  if (label) return `${label} - JSON View`;
+  return 'JSON View';
+}
+
 export function removePanelIn(host: Element): void {
   host.querySelector('.nsjv-panel')?.remove();
 }
@@ -73,6 +125,7 @@ export function isViewingJson(span: FieldSpan): boolean {
 export type FieldDiagnostic = {
   fieldType: string | null;
   fieldId: string | null;
+  fieldLabel: string | null;
   tag: string;
   parentDiv: boolean;
   valueTarget: string | null;
@@ -90,6 +143,7 @@ export function diagnoseFields(root: ParentNode = document): FieldDiagnostic[] {
     return {
       fieldType: span.getAttribute('data-field-type'),
       fieldId: span.getAttribute('data-field-id'),
+      fieldLabel: getFieldLabel(span),
       tag: span.tagName,
       parentDiv: getFieldDiv(span) !== null,
       valueTarget: target.tagName,

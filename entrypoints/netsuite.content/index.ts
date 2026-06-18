@@ -4,7 +4,9 @@ import {
   diagnoseFields,
   FIELD_SELECTOR,
   findFieldContainers,
+  formatPanelTitle,
   getFieldHost,
+  getFieldLabel,
   isFieldEditable,
   isJsonViewDisabled,
   isTextareaFieldSpan,
@@ -67,6 +69,7 @@ function exposeDiagnostics(): void {
 function createPanel(
   target: ValueTarget,
   parsed: unknown,
+  fieldLabel: string | null,
   options: PanelOptions,
 ): HTMLElement {
   const panel = document.createElement('div');
@@ -77,7 +80,7 @@ function createPanel(
 
   const title = document.createElement('span');
   title.className = 'nsjv-title';
-  title.textContent = 'JSON View';
+  title.textContent = formatPanelTitle(fieldLabel);
 
   const actions = document.createElement('div');
   actions.className = 'nsjv-actions';
@@ -128,10 +131,11 @@ function showJsonView(
   parsed: unknown,
 ): void {
   const host = getFieldHost(span);
+  const fieldLabel = getFieldLabel(span);
   removePanelIn(host);
   host.classList.add(MASKED_CLASS);
 
-  const panel = createPanel(target, parsed, {
+  const panel = createPanel(target, parsed, fieldLabel, {
     onDisableView: () => disableJsonView(span),
   });
 
