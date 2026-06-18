@@ -5,6 +5,7 @@ import {
   FIELD_SELECTOR,
   findFieldContainers,
   getFieldHost,
+  isFieldEditable,
   isJsonViewDisabled,
   isTextareaFieldSpan,
   isViewingJson,
@@ -145,10 +146,30 @@ function disableJsonView(span: FieldSpan): void {
   span.setAttribute(PROCESSED_ATTR, RAW_MODE);
 }
 
+function teardownJsonView(span: FieldSpan): void {
+  const host = getFieldHost(span);
+  host.classList.remove(MASKED_CLASS);
+  removePanelIn(host);
+  span.removeAttribute(BOUND_ATTR);
+
+  if (isViewingJson(span)) {
+    span.removeAttribute(PROCESSED_ATTR);
+  }
+}
+
 function enhanceField(span: FieldSpan): boolean {
+  const target = resolveValueTarget(span);
+
+  if (isFieldEditable(target)) {
+    if (isViewingJson(span)) {
+      teardownJsonView(span);
+      debug('Removed JSON view — record is in edit mode', span.getAttribute('data-field-id'));
+    }
+    return false;
+  }
+
   if (isViewingJson(span) || isJsonViewDisabled(span)) return false;
 
-  const target = resolveValueTarget(span);
   const value = readFieldValue(target);
   const parsed = tryParseJson(value);
 
@@ -174,7 +195,17 @@ function bindValueWatchers(span: FieldSpan, target: ValueTarget): void {
   span.setAttribute(BOUND_ATTR, 'true');
 
   const refresh = () => {
-    if (!isViewingJson(span)) return;
+    if (isFieldEditable(target)) {
+      teardownJsonView(span);
+      return;
+    }
+
+    if (!isViewingJson(span)) {
+      if (!isJsonViewDisabled(span)) {
+        enhanceField(span);
+      }
+      return;
+    }
 
     const nextParsed = tryParseJson(readFieldValue(target));
     if (nextParsed === null) {
@@ -189,6 +220,12 @@ function bindValueWatchers(span: FieldSpan, target: ValueTarget): void {
   if (target instanceof HTMLTextAreaElement) {
     target.addEventListener('input', refresh);
     target.addEventListener('change', refresh);
+
+    const editModeObserver = new MutationObserver(refresh);
+    editModeObserver.observe(target, {
+      attributes: true,
+      attributeFilter: ['readonly', 'disabled'],
+    });
   } else {
     const observer = new MutationObserver(refresh);
     observer.observe(target, {

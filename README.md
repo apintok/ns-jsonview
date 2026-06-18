@@ -10,13 +10,22 @@ NetSuite often stores integration payloads, configuration, and API responses in 
 
 ## Solution
 
-When a NetSuite Text Area contains valid JSON (an object or array), the extension **replaces** the raw field UI with a **JSON View** panel:
+When a NetSuite Text Area contains valid JSON (an object or array), the extension **replaces** the raw field UI with a **JSON View** panel — **only while the record is in view mode**.
 
 - **Tree** — collapsible key/value explorer (always shown)
 - **Copy** — copies formatted JSON to the clipboard
-- **Disable View** — hides the JSON view and restores the original NetSuite field display (stays off until you reload the page)
+- **Disable View** — hides the JSON view and restores the original field display (stays off until you reload the page)
 
-The underlying `<textarea>` stays in the DOM (visually hidden) so NetSuite form save behavior stays intact.
+### View mode vs edit mode
+
+| Record mode | Extension behavior |
+|-------------|-------------------|
+| **View** | JSON tree replaces the field (if content is valid JSON) |
+| **Edit** | Standard NetSuite textarea — no masking, no JSON panel |
+
+Edit mode is detected when the field's `<textarea>` is not `readonly` and not `disabled`. Clicking **Edit** on a record removes the JSON view automatically; returning to view mode restores it (unless you used **Disable View**).
+
+The underlying `<textarea>` stays in the DOM (visually hidden in view mode) so NetSuite save behavior stays intact.
 
 ## How it works
 
@@ -34,10 +43,14 @@ Valid JSON object/array? ──no──► Leave field unchanged
         │
        yes
         ▼
-Inject JSON View panel below field
+Record in view mode? ──no (edit)──► Leave standard NetSuite field
+        │
+       yes
+        ▼
+Replace field with JSON View panel
         │
         ▼
-MutationObserver watches for dynamically added fields
+Watch for edit mode (textarea becomes editable) → remove JSON view
 ```
 
 ### Detection rules
@@ -46,8 +59,9 @@ MutationObserver watches for dynamically added fields
 |-----------|--------|
 | `div` contains `span[data-field-type="textarea"]` | Candidate |
 | Span text or inner `<textarea>` contains `{...}` or `[...]` | Parsed |
-| Content is valid JSON object or array | Panel shown |
-| Content is empty, a primitive, or invalid JSON | No panel |
+| Content is valid JSON object or array | Candidate |
+| Textarea is `readonly` or `disabled` (view mode) | JSON panel shown |
+| Textarea is editable (edit mode) | Standard NetSuite field only |
 
 ## Permissions
 

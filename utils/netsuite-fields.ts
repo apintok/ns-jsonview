@@ -58,6 +58,14 @@ export function removePanelIn(host: Element): void {
   host.querySelector('.nsjv-panel')?.remove();
 }
 
+export function isFieldEditable(target: ValueTarget): boolean {
+  if (target instanceof HTMLTextAreaElement) {
+    return !target.readOnly && !target.disabled;
+  }
+
+  return false;
+}
+
 export function isViewingJson(span: FieldSpan): boolean {
   return span.getAttribute('data-ns-jsonview') === VIEW_MODE;
 }
@@ -71,6 +79,7 @@ export type FieldDiagnostic = {
   valueLength: number;
   valuePreview: string;
   isValidJson: boolean;
+  isEditable: boolean;
 };
 
 export function diagnoseFields(root: ParentNode = document): FieldDiagnostic[] {
@@ -87,6 +96,7 @@ export function diagnoseFields(root: ParentNode = document): FieldDiagnostic[] {
       valueLength: value.length,
       valuePreview: value.slice(0, 120),
       isValidJson: tryParseJson(value) !== null,
+      isEditable: isFieldEditable(target),
     };
   });
 }
